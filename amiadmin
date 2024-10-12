@@ -1,0 +1,10 @@
+$administratorsGroup = Get-LocalGroupMember -Group 'Administrators'
+$currentUserName = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+
+$isAdmin = $administratorsGroup | Where-Object { $_.Name -eq $currentUserName }
+
+if ($isAdmin) {
+    Write-Host "Current user is a local administrator."
+} else {
+    Write-Host "Current user is not a local administrator."
+}

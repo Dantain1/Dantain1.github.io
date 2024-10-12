@@ -1,18 +1,29 @@
 <#
 .SYNOPSIS
-This script detects the operating system and runs the appropriate script.
+This script detects the operating system and runs the appropriate script, handling errors gracefully.
 .DESCRIPTION
 This script can be run from PowerShell, Command Prompt, or Unix-like shells.
-It detects the operating system and then executes the appropriate script for that OS.
+It detects the operating system, executes the appropriate script for that OS, and handles errors by printing them to the terminal without exiting.
 #>
 
-if ($PSVersionTable.PSVersion) {
-    # PowerShell
-    $os = if ($IsWindows) { "windows" } elseif ($IsMacOS) { "mac" } elseif ($IsLinux) { "linux" } else { "unknown" }
-} else {
-    # Batch or Shell
-    @'
+function Write-ErrorMessage {
+    param([string]$message)
+    if ($PSVersionTable.PSVersion) {
+        Write-Host $message -ForegroundColor Red
+    } else {
+        echo $message 1>&2
+    }
+}
+
+try {
+    if ($PSVersionTable.PSVersion) {
+        # PowerShell
+        $os = if ($IsWindows) { "windows" } elseif ($IsMacOS) { "mac" } elseif ($IsLinux) { "linux" } else { "unknown" }
+    } else {
+        # Batch or Shell
+        @'
 @echo off
+setlocal EnableDelayedExpansion
 if "%OS%"=="Windows_NT" (
     powershell -Command "$os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'mac' } elseif ($IsLinux) { 'linux' } else { 'unknown' }; Write-Output $os" > %TEMP%\os.txt
     set /p os=<%TEMP%\os.txt
@@ -24,44 +35,43 @@ if "%OS%"=="Windows_NT" (
         if "%%i"=="Darwin" set os=mac
     )
 )
-if "%os%"=="windows" (
-    echo Windows detected. Running PowerShell script...
-    powershell -Command "Write-Host 'This is the PowerShell script for Windows'; # Add your PowerShell script content here"
-) else if "%os%"=="linux" (
-    echo Linux detected. Running Bash script...
-    bash -c "echo 'This is the Bash script for Linux'; # Add your Bash script content here"
-) else if "%os%"=="mac" (
-    echo macOS detected. Running Bash script...
-    bash -c "echo 'This is the Bash script for macOS'; # Add your Bash script content here"
-) else (
-    echo Unsupported operating system
-    exit /b 1
-)
+echo !os!
 exit /b 0
 '@ | Out-File -Encoding ASCII detect_os.bat
 
-    # Run the batch file and capture its output
-    $os = cmd /c detect_os.bat 2`>`&1
-    Remove-Item detect_os.bat
-}
+        # Run the batch file and capture its output
+        $os = cmd /c detect_os.bat 2>&1
+        Remove-Item detect_os.bat
+    }
 
-# Now $os contains the detected operating system
-switch ($os) {
-    "windows" {
-        Write-Host "Windows detected. Running PowerShell script..."
-        Write-Host "This is the PowerShell script for Windows"
-        # Add your PowerShell script content here
+    # Now $os contains the detected operating system
+    switch ($os) {
+        "windows" {
+            Write-Host "Windows detected. Running PowerShell script..."
+            # Add your PowerShell script content here
+            Write-Host "This is the PowerShell script for Windows"
+        }
+        "linux" {
+            Write-Host "Linux detected. Running Bash script..."
+            bash -c "echo 'This is the Bash script for Linux'; # Add your Bash script content here" 2>&1
+        }
+        "mac" {
+            Write-Host "macOS detected. Running Bash script..."
+            bash -c "echo 'This is the Bash script for macOS'; # Add your Bash script content here" 2>&1
+        }
+        default {
+            throw "Unsupported operating system: $os"
+        }
     }
-    "linux" {
-        Write-Host "Linux detected. Running Bash script..."
-        bash -c "echo 'This is the Bash script for Linux'; # Add your Bash script content here"
-    }
-    "mac" {
-        Write-Host "macOS detected. Running Bash script..."
-        bash -c "echo 'This is the Bash script for macOS'; # Add your Bash script content here"
-    }
-    default {
-        Write-Host "Unsupported operating system"
-        exit 1
+}
+catch {
+    Write-ErrorMessage "An error occurred: $_"
+}
+finally {
+    Write-Host "Script execution completed. Press any key to exit."
+    if ($PSVersionTable.PSVersion) {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } else {
+        pause > nul
     }
 }

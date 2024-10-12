@@ -1,0 +1,67 @@
+<#
+.SYNOPSIS
+This script detects the operating system and runs the appropriate script.
+.DESCRIPTION
+This script can be run from PowerShell, Command Prompt, or Unix-like shells.
+It detects the operating system and then executes the appropriate script for that OS.
+#>
+
+if ($PSVersionTable.PSVersion) {
+    # PowerShell
+    $os = if ($IsWindows) { "windows" } elseif ($IsMacOS) { "mac" } elseif ($IsLinux) { "linux" } else { "unknown" }
+} else {
+    # Batch or Shell
+    @'
+@echo off
+if "%OS%"=="Windows_NT" (
+    powershell -Command "$os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'mac' } elseif ($IsLinux) { 'linux' } else { 'unknown' }; Write-Output $os" > %TEMP%\os.txt
+    set /p os=<%TEMP%\os.txt
+    del %TEMP%\os.txt
+) else (
+    set os=unknown
+    for /f "tokens=1" %%i in ('uname') do (
+        if "%%i"=="Linux" set os=linux
+        if "%%i"=="Darwin" set os=mac
+    )
+)
+if "%os%"=="windows" (
+    echo Windows detected. Running PowerShell script...
+    powershell -Command "Write-Host 'This is the PowerShell script for Windows'; # Add your PowerShell script content here"
+) else if "%os%"=="linux" (
+    echo Linux detected. Running Bash script...
+    bash -c "echo 'This is the Bash script for Linux'; # Add your Bash script content here"
+) else if "%os%"=="mac" (
+    echo macOS detected. Running Bash script...
+    bash -c "echo 'This is the Bash script for macOS'; # Add your Bash script content here"
+) else (
+    echo Unsupported operating system
+    exit /b 1
+)
+exit /b 0
+'@ | Out-File -Encoding ASCII detect_os.bat
+
+    # Run the batch file and capture its output
+    $os = cmd /c detect_os.bat 2`>`&1
+    Remove-Item detect_os.bat
+}
+
+# Now $os contains the detected operating system
+switch ($os) {
+    "windows" {
+        Write-Host "Windows detected. Running PowerShell script..."
+        Write-Host "This is the PowerShell script for Windows"
+        # Add your PowerShell script content here
+    }
+    "linux" {
+        Write-Host "Linux detected. Running Bash script..."
+        bash -c "echo 'This is the Bash script for Linux'; # Add your Bash script content here"
+    }
+    "mac" {
+        Write-Host "macOS detected. Running Bash script..."
+        bash -c "echo 'This is the Bash script for macOS'; # Add your Bash script content here"
+    }
+    default {
+        Write-Host "Unsupported operating system"
+        exit 1
+    }
+}

@@ -3,26 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Electronic Circuit Cyber Shield</title>
+    <title>West Mids Cyber Shield</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             background-color: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        .shield-container {
+            position: relative;
+            width: 400px;
+            height: 480px;
+            margin-bottom: 20px;
         }
 
         .shield {
-            width: 400px;
-            height: 480px;
+            width: 100%;
+            height: 100%;
             background-color: #0066cc;
-            position: relative;
-            z-index: 10;
             clip-path: polygon(
                 0 0,
                 100% 0,
@@ -32,6 +38,9 @@
             );
             border-bottom-left-radius: 50% 20%;
             border-bottom-right-radius: 50% 20%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .shield::before {
@@ -60,124 +69,41 @@
             border-bottom-right-radius: inherit;
         }
 
-        .cyber-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        .shield-text {
+            position: relative;
             z-index: 1;
+            color: white;
+            font-size: 72px;
+            font-weight: 900;
+            line-height: 1;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
-        .matrix-code {
-            position: absolute;
-            color: #00ff00;
-            font-size: 12px;
-            opacity: 0.7;
-            animation: fade 2s infinite alternate;
+        .contact-button {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.3s;
         }
 
-        .circuit {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
-            opacity: 0.2;
-        }
-
-        @keyframes fade {
-            0% {
-                opacity: 0.3;
-            }
-            100% {
-                opacity: 0.7;
-            }
+        .contact-button:hover {
+            color: #0066cc;
         }
     </style>
 </head>
 <body>
-    <div class="cyber-bg">
-        <!-- Matrix code will be added here via JavaScript -->
+    <div class="shield-container">
+        <div class="shield">
+            <div class="shield-text">
+                WEST<br>
+                MIDS<br>
+                CYBER
+            </div>
+        </div>
     </div>
-    <svg class="circuit" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
-        <!-- Circuit lines will be added here via JavaScript -->
-    </svg>
-    <div class="shield"></div>
-
-    <script>
-        const cyberBg = document.querySelector('.cyber-bg');
-        const circuit = document.querySelector('.circuit');
-        const codeCount = 500;
-        const lineCount = 100;
-
-        // Create matrix code
-        const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
-        for (let i = 0; i < codeCount; i++) {
-            const code = document.createElement('div');
-            code.className = 'matrix-code';
-            code.style.left = `${Math.random() * 100}%`;
-            code.style.top = `${Math.random() * 100}%`;
-            code.textContent = matrixChars[Math.floor(Math.random() * matrixChars.length)];
-            code.style.animationDelay = `${Math.random() * 2}s`;
-            cyberBg.appendChild(code);
-        }
-
-        // Create circuit lines
-        function createCircuitLine(startX, startY, direction, length, depth = 0) {
-            if (depth > 3) return;
-
-            let endX = startX;
-            let endY = startY;
-
-            if (direction === 'horizontal') {
-                endX = startX + length;
-            } else {
-                endY = startY + length;
-            }
-
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', startX);
-            line.setAttribute('y1', startY);
-            line.setAttribute('x2', endX);
-            line.setAttribute('y2', endY);
-            line.setAttribute('stroke', '#00ff00');
-            line.setAttribute('stroke-width', '2');
-
-            if (Math.random() < 0.3) {
-                line.setAttribute('stroke-dasharray', '10,5');
-            }
-
-            circuit.appendChild(line);
-
-            // Add connector
-            if (Math.random() < 0.3) {
-                const connector = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                connector.setAttribute('cx', endX);
-                connector.setAttribute('cy', endY);
-                connector.setAttribute('r', '4');
-                connector.setAttribute('fill', '#00ff00');
-                circuit.appendChild(connector);
-            }
-
-            // Create branching lines
-            if (Math.random() < 0.7) {
-                const newDirection = direction === 'horizontal' ? 'vertical' : 'horizontal';
-                const newLength = Math.random() * 200 + 50;
-                createCircuitLine(endX, endY, newDirection, newLength, depth + 1);
-            }
-        }
-
-        // Generate initial circuit lines
-        for (let i = 0; i < lineCount; i++) {
-            const startX = Math.random() * 1000;
-            const startY = Math.random() * 1000;
-            const direction = Math.random() < 0.5 ? 'horizontal' : 'vertical';
-            const length = Math.random() * 300 + 100;
-            createCircuitLine(startX, startY, direction, length);
-        }
-    </script>
+    <a href="mailto:info@westmidscyber.com" class="contact-button">Contact Us</a>
 </body>
 </html>

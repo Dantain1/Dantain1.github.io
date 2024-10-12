@@ -1,28 +1,36 @@
-# Cool PowerShell Menu Script
+# Updated Cool PowerShell Menu Script with GitHub Integration
+
+$scriptUrl = "https://raw.githubusercontent.com/Dantain1/Dantain1.github.io/refs/heads/main/Whatismyip.ps1"
 
 function Show-Menu {
     Clear-Host
     Write-Host @"
     =======================================
     |                                     |
-    |  [1] What is my IP?                 |
+    |        IP Address Checker           |
     |                                     |
+    =======================================
+    |                                     |
+    |  [1] Check My IP Addresses          |
     |  [Q] Quit                           |
-    |                                     |
-    |                                     |
     |                                     |
     =======================================
 "@ -ForegroundColor Cyan
 }
 
-function Run-Script {
-    param (
-        [string]$ScriptName
-    )
-    Write-Host "Running $ScriptName..." -ForegroundColor Yellow
-    # Replace the following line with the actual command to run your GitHub-hosted script
-    Write-Host "Placeholder: Running $ScriptName from GitHub" -ForegroundColor Green
-    Start-Sleep -Seconds 2
+function Run-GitHubScript {
+    Write-Host "Fetching and running IP address script from GitHub..." -ForegroundColor Yellow
+    try {
+        $scriptContent = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content
+        Invoke-Expression $scriptContent
+    }
+    catch {
+        Write-Host "Error: Unable to fetch or run the script from GitHub." -ForegroundColor Red
+        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    
+    Write-Host "`nPress any key to return to the menu..."
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
 do {
@@ -30,10 +38,7 @@ do {
     $choice = Read-Host "Enter your choice"
     
     switch ($choice) {
-        '1' { Run-Script "Script 1" }
-        '2' { Run-Script "Script 2" }
-        '3' { Run-Script "Script 3" }
-        '4' { Run-Script "Script 4" }
+        '1' { Run-GitHubScript }
         'Q' { 
             Write-Host "Exiting..." -ForegroundColor Red
             return
@@ -42,10 +47,5 @@ do {
             Write-Host "Invalid choice. Please try again." -ForegroundColor Red
             Start-Sleep -Seconds 1
         }
-    }
-    
-    if ($choice -ne 'Q') {
-        Write-Host "Press any key to continue..."
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     }
 } while ($choice -ne 'Q')

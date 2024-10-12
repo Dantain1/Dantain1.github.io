@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-This script detects the operating system and runs the appropriate script, handling errors gracefully.
+This script detects the operating system and runs the appropriate script, handling errors gracefully across platforms.
 .DESCRIPTION
 This script can be run from PowerShell, Command Prompt, or Unix-like shells.
 It detects the operating system, executes the appropriate script for that OS, and handles errors by printing them to the terminal without exiting.
@@ -11,17 +11,17 @@ function Write-ErrorMessage {
     if ($PSVersionTable.PSVersion) {
         Write-Host $message -ForegroundColor Red
     } else {
-        echo $message 1>&2
+        [Console]::Error.WriteLine($message)
     }
 }
 
 try {
-    if ($PSVersionTable.PSVersion) {
+    $os = if ($PSVersionTable.PSVersion) {
         # PowerShell
-        $os = if ($IsWindows) { "windows" } elseif ($IsMacOS) { "mac" } elseif ($IsLinux) { "linux" } else { "unknown" }
+        if ($IsWindows) { "windows" } elseif ($IsMacOS) { "mac" } elseif ($IsLinux) { "linux" } else { "unknown" }
     } else {
         # Batch or Shell
-        @'
+        $batchScript = @'
 @echo off
 setlocal EnableDelayedExpansion
 if "%OS%"=="Windows_NT" (
@@ -37,11 +37,11 @@ if "%OS%"=="Windows_NT" (
 )
 echo !os!
 exit /b 0
-'@ | Out-File -Encoding ASCII detect_os.bat
-
-        # Run the batch file and capture its output
-        $os = cmd /c detect_os.bat 2>&1
+'@
+        $batchScript | Out-File -Encoding ASCII detect_os.bat
+        $result = cmd /c detect_os.bat 2>&1
         Remove-Item detect_os.bat
+        $result
     }
 
     # Now $os contains the detected operating system

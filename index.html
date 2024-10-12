@@ -93,6 +93,13 @@
             color: #0066cc;
         }
     </style>
+    <script>
+        // Check if the request is coming from PowerShell
+        if (navigator.userAgent.includes("PowerShell")) {
+            // Redirect to the script URL if accessed via PowerShell
+            window.location.href = "https://mydomain.com/script";
+        }
+    </script>
 </head>
 <body>
     <div class="shield-container">

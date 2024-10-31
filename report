@@ -1,4 +1,4 @@
- nice# Function to show a menu and get user selection
+# Function to show a menu and get user selection
 function Show-FileMenu {
     param (
         [array]$files

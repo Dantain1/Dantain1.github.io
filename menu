@@ -1,51 +1,97 @@
-# Updated Cool PowerShell Menu Script with GitHub Integration
-
-$scriptUrl = "https://raw.githubusercontent.com/Dantain1/Dantain1.github.io/refs/heads/main/Whatismyip.ps1"
-
-function Show-Menu {
-    Clear-Host
-    Write-Host @"
-    =======================================
-    |                                     |
-    |        IP Address Checker           |
-    |                                     |
-    =======================================
-    |                                     |
-    |  [1] Check My IP Addresses          |
-    |  [Q] Quit                           |
-    |                                     |
-    =======================================
-"@ -ForegroundColor Cyan
+function Show-AsciiArt {
+    $ascii = @"
+    ╔══════════════════════════════════════╗
+    ║     ███████╗███████╗ ██████╗         ║
+    ║     ██╔════╝██╔════╝██╔════╝         ║
+    ║     ███████╗█████╗  ██║              ║
+    ║     ╚════██║██╔══╝  ██║              ║
+    ║     ███████║███████╗╚██████╗         ║
+    ║     ╚══════╝╚══════╝ ╚═════╝         ║
+    ║        Security Toolkit v1.0          ║
+    ╚══════════════════════════════════════╝
+"@
+    Write-Host $ascii -ForegroundColor Cyan
 }
 
-function Run-GitHubScript {
-    Write-Host "Fetching and running IP address script from GitHub..." -ForegroundColor Yellow
+function Show-LoadingAnimation {
+    $loadingChars = '|', '/', '-', '\'
+    foreach ($char in $loadingChars * 3) {
+        Write-Host "`rInitializing [$char]" -NoNewline
+        Start-Sleep -Milliseconds 100
+    }
+    Write-Host "`r                      " -NoNewline
+}
+
+function Show-Menu {
+    param (
+        [int]$SelectedIndex = 0
+    )
+    $options = @(
+        "What is my IP?  [bryan.tool/Whatismtip]",
+        "Am I admin?     [bryan.tools/amiadmin]",
+        "AV Detect       [bryan.tools/detect]",
+        "Exfiltrator     [bryan.tools/exfil]",
+        "Reporter        [bryan.tools/report]",
+        "Exit"
+    )
+
+    Clear-Host
+    Show-AsciiArt
+    Write-Host "`nUse ↑/↓ arrows to navigate, Enter to select`n" -ForegroundColor Yellow
+
+    for ($i = 0; $i -lt $options.Count; $i++) {
+        if ($i -eq $SelectedIndex) {
+            Write-Host "→ $($options[$i])" -ForegroundColor Green
+        } else {
+            Write-Host "  $($options[$i])" -ForegroundColor Gray
+        }
+    }
+}
+
+function Invoke-Tool {
+    param (
+        [string]$Url
+    )
+    Write-Host "`nExecuting script from $Url..." -ForegroundColor Yellow
     try {
-        $scriptContent = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content
-        Invoke-Expression $scriptContent
+        $result = Invoke-RestMethod -Uri $Url
+        Invoke-Expression $result
+    } catch {
+        Write-Host "Error executing script: $_" -ForegroundColor Red
     }
-    catch {
-        Write-Host "Error: Unable to fetch or run the script from GitHub." -ForegroundColor Red
-        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Red
-    }
-    
-    Write-Host "`nPress any key to return to the menu..."
+    Write-Host "`nPress any key to continue..."
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
-do {
-    Show-Menu
-    $choice = Read-Host "Enter your choice"
+# Main menu loop
+$selectedIndex = 0
+Show-LoadingAnimation
+
+while ($true) {
+    Show-Menu -SelectedIndex $selectedIndex
     
-    switch ($choice) {
-        '1' { Run-GitHubScript }
-        'Q' { 
-            Write-Host "Exiting..." -ForegroundColor Red
-            return
+    $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    
+    switch ($key.VirtualKeyCode) {
+        38 { # Up arrow
+            if ($selectedIndex -gt 0) { $selectedIndex-- }
         }
-        default {
-            Write-Host "Invalid choice. Please try again." -ForegroundColor Red
-            Start-Sleep -Seconds 1
+        40 { # Down arrow
+            if ($selectedIndex -lt 5) { $selectedIndex++ }
+        }
+        13 { # Enter
+            switch ($selectedIndex) {
+                0 { Invoke-Tool -Url "bryan.tool/Whatismtip" }
+                1 { Invoke-Tool -Url "bryan.tools/amiadmin" }
+                2 { Invoke-Tool -Url "bryan.tools/detect" }
+                3 { Invoke-Tool -Url "bryan.tools/exfil" }
+                4 { Invoke-Tool -Url "bryan.tools/report" }
+                5 { 
+                    Clear-Host
+                    Write-Host "Goodbye!" -ForegroundColor Cyan
+                    return
+                }
+            }
         }
     }
-} while ($choice -ne 'Q')
+}

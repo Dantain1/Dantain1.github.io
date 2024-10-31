@@ -120,7 +120,7 @@ function Process-CsvFile {
             $score = [decimal]$_.'CVSS3 Base Score'
             switch ($score) {
                 {$_ -ge 9.0} {"Critical (9.0-10.0)"}
-                {$_ -ge 7.0} {"High (7.0-8.9)"}
+                {$_ -ge 7.0 -and $_ -lt 9.0} {"High (7.0-8.9)"}
                 
             }
         } | Sort-Object Name | ForEach-Object {

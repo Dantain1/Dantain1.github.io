@@ -18,14 +18,20 @@ function Show-LoadingAnimation {
 
 function Show-Banner {
     $banner = @"
-$$$$$$$\  $$$$$$$\ $$\     $$\  $$$$$$\  $$\   $$\       $$$$$$$\   $$$$$$\ $$$$$$$$\       $$$$$$$$\  $$$$$$\   $$$$$$\  $$\       $$$$$$\  
-$$  __$$\ $$  __$$\\$$\   $$  |$$  __$$\ $$$\  $$ |      $$  __$$\ $$  __$$\\__$$  __|      \__$$  __|$$  __$$\ $$  __$$\ $$ |     $$  __$$\ 
-$$ |  $$ |$$ |  $$ |\$$\ $$  / $$ /  $$ |$$$$\ $$ |      $$ |  $$ |$$ /  $$ |  $$ |            $$ |   $$ /  $$ |$$ /  $$ |$$ |     $$ /  \__|
-$$$$$$$\ |$$$$$$$  | \$$$$  /  $$$$$$$$ |$$ $$\$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |     \$$$$$$\  
-$$  __$$\ $$  __$$<   \$$  /   $$  __$$ |$$ \$$$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |      \____$$\ 
-$$ |  $$ |$$ |  $$ |   $$ |    $$ |  $$ |$$ |\$$$ |      $$ |  $$ |$$ |  $$ |  $$ |            $$ |   $$ |  $$ |$$ |  $$ |$$ |     $$\   $$ |
-$$$$$$$  |$$ |  $$ |   $$ |    $$ |  $$ |$$ | \$$ |      $$$$$$$  | $$$$$$  |  $$ |            $$ |    $$$$$$  | $$$$$$  |$$$$$$$$\\$$$$$$  |
-\_______/ \__|  \__|   \__|    \__|  \__|\__|  \__|      \_______/  \______/   \__|            \__|    \______/  \______/ \________|\______/ 
+  ____  ______   __ _    _   _ 
+ | __ )|  _ \ \ / // \  | \ | |
+ |  _ \| |_) \ V // _ \ |  \| |
+ | |_) |  _ < | |/ ___ \| |\  |
+ |____/|_|_\_\|_/_/   \_\_| \_|
+ |  _ \ / _ \_   _|            
+ | | | | | | || |              
+ | |_| | |_| || |              
+ |____/ \___/ |_|  _     ____  
+ |_   _/ _ \ / _ \| |   / ___| 
+   | || | | | | | | |   \___ \ 
+   | || |_| | |_| | |___ ___) |
+   |_| \___/ \___/|_____|____/ 
+                               
 ==============================================================
                     Security Toolkit v1.0
 ==============================================================
@@ -60,39 +66,20 @@ function Show-Menu {
     Write-Host "`n   [0] Exit" -ForegroundColor Red
 }
 
-function Show-ExecutionAnimation {
-    param(
-        [string]$ToolName
-    )
-    $frames = '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'
-    $colors = @('Cyan', 'Yellow', 'Green', 'Magenta')
-    $i = 0
-    foreach ($frame in $frames * 3) {
-        $color = $colors[$i % $colors.Count]
-        Write-Host "`rExecuting $ToolName $frame" -NoNewline -ForegroundColor $color
-        Start-Sleep -Milliseconds 100
-        $i++
-    }
-    Write-Host "`r                                 " -NoNewline
-}
-
 function Invoke-SelectedTool {
     param (
         [string]$Url,
         [string]$ToolName
     )
-    Write-Host "`n"
-    Show-ExecutionAnimation -ToolName $ToolName
     try {
-        Write-Host "`nConnecting to $ToolName..." -ForegroundColor Yellow
+        Write-Host "`nExecuting $ToolName..." -ForegroundColor Yellow
         $result = Invoke-RestMethod -Uri $Url -UseBasicParsing
         if ($result) {
-            Write-Host "Executing script..." -ForegroundColor Green
             Invoke-Expression $result
         }
     }
     catch {
-        Write-Host "`nError executing script: $_" -ForegroundColor Red
+        Write-Host "Error executing script: $_" -ForegroundColor Red
     }
     Write-Host "`nPress any key to return to menu..." -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')

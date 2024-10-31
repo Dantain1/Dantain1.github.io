@@ -120,8 +120,8 @@ function Process-CsvFile {
             $score = [decimal]$_.'CVSS3 Base Score'
             switch ($score) {
                 {$_ -ge 9.0} {"Critical (9.0-10.0)"}
-                {$_ -ge 8.0} {"High (8.0-8.9)"}
-                {$_ -ge 7.0} {"Moderate (7.0-7.9)"}
+                {$_ -ge 7.0} {"High (7.0-8.9)"}
+                
             }
         } | Sort-Object Name | ForEach-Object {
             Write-Host "$($_.Name): $($_.Count) findings" -ForegroundColor Magenta

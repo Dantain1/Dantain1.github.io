@@ -56,7 +56,7 @@ function Show-Menu {
     for ($i = 0; $i -lt $tools.Count; $i++) {
         $tool = $tools.Keys | Select-Object -Index $i
         if ($i -eq $SelectedIndex) {
-            Write-Host " → " -NoNewline -ForegroundColor Cyan
+            Write-Host ">> " -NoNewline -ForegroundColor Cyan  # Changed from → to >>
             Write-Host "[$($i + 1)] $tool" -ForegroundColor White -BackgroundColor DarkBlue
         } else {
             Write-Host "   [$($i + 1)] $tool" -ForegroundColor Green

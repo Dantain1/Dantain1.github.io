@@ -1,6 +1,6 @@
 # Define the tool URLs in a hashtable for better management
 $tools = @{
-    "What is my IP?" = "http://bryan.tool/Whatismtip"
+    "What is my IP?" = "http://bryan.tools/Whatismyip"
     "Am I admin?"    = "http://bryan.tools/amiadmin"
     "AV Detect"      = "http://bryan.tools/detect"
     "Exfiltrator"    = "http://bryan.tools/exfil"

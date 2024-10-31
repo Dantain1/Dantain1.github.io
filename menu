@@ -36,7 +36,7 @@ function Show-Banner {
                     Security Toolkit v1.0
 ==============================================================
 "@
-    $colors = @('Cyan', 'Red', 'Green')
+    $colors = @('Red', 'DarkRed', 'Red', 'DarkRed')
     $lines = $banner -split "`n"
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $color = $colors[$i % $colors.Count]

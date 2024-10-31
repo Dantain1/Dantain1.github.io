@@ -1,4 +1,4 @@
-# Function to show a menu and get user selection
+ nice# Function to show a menu and get user selection
 function Show-FileMenu {
     param (
         [array]$files
@@ -175,4 +175,4 @@ do {
     }
 } while ($true)
 
-Write-Host "`nScript completed. Goodbye!" -ForegroundColor Green
+Write-Host "`nHave a nice day!" -ForegroundColor Green

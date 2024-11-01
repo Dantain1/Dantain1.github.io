@@ -29,14 +29,14 @@ function Test-EICARDetection {
         if (Test-Path $testFile) {
             try {
                 $content = Get-Content $testFile -ErrorAction Stop
-                Write-Host "WARNING: EICAR test file could be read - file may not be detected"
+                Write-Host "WARNING: EICAR test file could be read - file may not be detected" -ForegroundColor Red
             } catch {
-                Write-Host "SUCCESS: EICAR test file access was blocked"
+                Write-Host "SUCCESS: EICAR test file access was blocked" -ForegroundColor Green
             }
         }
         
     } catch {
-        Write-Host "An error occurred: $_"
+        Write-Host "An error occurred: $_" 
     } finally {
         # Cleanup
         Write-Host "`nCleaning up test files..."

@@ -5,6 +5,9 @@ $tools = @{
     "AV Detect"      = "http://bryan.tools/detect"
     "Exfiltrator"    = "http://bryan.tools/exfil"
     "Reporter"       = "http://bryan.tools/report"
+    "AV Tester"       = "http://bryan.tools/AVTest"
+    "Auditor"       = "http://bryan.tools/Auditor"
+    "EICAR"       = "http://bryan.tools/EICAR"
 }
 
 function Show-LoadingAnimation {

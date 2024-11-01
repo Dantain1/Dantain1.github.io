@@ -1,0 +1,113 @@
+# Import Windows Forms assembly
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Create the main form
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "EICAR Security Test"
+$form.Size = New-Object System.Drawing.Size(400,250)
+$form.StartPosition = "CenterScreen"
+$form.FormBorderStyle = "FixedDialog"
+$form.MaximizeBox = $false
+
+# Create status label
+$statusLabel = New-Object System.Windows.Forms.Label
+$statusLabel.Location = New-Object System.Drawing.Point(20,20)
+$statusLabel.Size = New-Object System.Drawing.Size(340,40)
+$statusLabel.Text = "Click 'Run Test' to check if your system blocks EICAR test files."
+$statusLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$form.Controls.Add($statusLabel)
+
+# Create result panel
+$resultPanel = New-Object System.Windows.Forms.Panel
+$resultPanel.Location = New-Object System.Drawing.Point(20,70)
+$resultPanel.Size = New-Object System.Drawing.Size(340,80)
+$resultPanel.BorderStyle = "FixedSingle"
+$resultPanel.BackColor = [System.Drawing.Color]::White
+
+# Create result label
+$resultLabel = New-Object System.Windows.Forms.Label
+$resultLabel.Location = New-Object System.Drawing.Point(0,0)
+$resultLabel.Size = New-Object System.Drawing.Size(338,78)
+$resultLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$resultLabel.Font = New-Object System.Drawing.Font("Arial", 12, [System.Drawing.FontStyle]::Bold)
+$resultPanel.Controls.Add($resultLabel)
+$form.Controls.Add($resultPanel)
+
+# Create Run Test button
+$runButton = New-Object System.Windows.Forms.Button
+$runButton.Location = New-Object System.Drawing.Point(20,170)
+$runButton.Size = New-Object System.Drawing.Size(160,30)
+$runButton.Text = "Run Test"
+$form.Controls.Add($runButton)
+
+# Create Exit button
+$exitButton = New-Object System.Windows.Forms.Button
+$exitButton.Location = New-Object System.Drawing.Point(200,170)
+$exitButton.Size = New-Object System.Drawing.Size(160,30)
+$exitButton.Text = "Exit"
+$form.Controls.Add($exitButton)
+
+# Test function
+function Test-EICARDetection {
+    $testDir = Join-Path $env:TEMP "SecurityTest"
+    New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+    $testResult = $false
+
+    try {
+        $eicarString = 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'
+        $testFile = Join-Path $testDir "eicar-test.com"
+        
+        $eicarString | Out-File -FilePath $testFile -Encoding ascii -NoNewline
+        
+        if (Test-Path $testFile) {
+            $content = Get-Content $testFile -ErrorAction Stop
+            # If we get here, the file wasn't blocked
+            $testResult = $false
+        } else {
+            # File was blocked from being created
+            $testResult = $true
+        }
+    } catch {
+        # If any operation was blocked by AV, consider it a success
+        $testResult = $true
+    } finally {
+        # Cleanup
+        if (Test-Path $testDir) {
+            Remove-Item -Path $testDir -Recurse -Force
+        }
+    }
+    
+    return $testResult
+}
+
+# Button click handlers
+$runButton.Add_Click({
+    $runButton.Enabled = $false
+    $statusLabel.Text = "Running test..."
+    $resultLabel.Text = "Testing..."
+    $resultPanel.BackColor = [System.Drawing.Color]::White
+    
+    # Update the UI using a background job
+    $form.Refresh()
+    
+    $testResult = Test-EICARDetection
+    
+    if ($testResult) {
+        $resultLabel.Text = "TEST SUCCESSFUL`n`nSystem blocked EICAR test file"
+        $resultPanel.BackColor = [System.Drawing.Color]::LightGreen
+    } else {
+        $resultLabel.Text = "TEST FAILED`n`nSystem did not block EICAR test file"
+        $resultPanel.BackColor = [System.Drawing.Color]::LightPink
+    }
+    
+    $statusLabel.Text = "Test complete. Click 'Run Test' to try again."
+    $runButton.Enabled = $true
+})
+
+$exitButton.Add_Click({
+    $form.Close()
+})
+
+# Show the form
+[void]$form.ShowDialog()

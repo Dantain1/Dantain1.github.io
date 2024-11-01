@@ -1,0 +1,52 @@
+# Script to test antivirus response using EICAR test file
+
+function Test-EICARDetection {
+    # Create test directory
+    $testDir = "C:\SecurityTest"
+    New-Item -ItemType Directory -Force -Path $testDir
+
+    try {
+        # EICAR test string (this is a known test file, not malware)
+        $eicarString = 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'
+        $testFile = Join-Path $testDir "eicar-test.com"
+        
+        Write-Host "Starting EICAR detection test..."
+        Write-Host "Test directory: $testDir"
+        
+        # Test 1: Write EICAR string to file
+        Write-Host "`nTest 1: Creating EICAR test file..."
+        $eicarString | Out-File -FilePath $testFile -Encoding ascii -NoNewline
+        
+        # Check if file exists or was blocked
+        if (Test-Path $testFile) {
+            Write-Host "WARNING: EICAR test file was created successfully - file may not be detected"
+        } else {
+            Write-Host "SUCCESS: EICAR test file was blocked from being created"
+        }
+        
+        # Test 2: Attempt to read file
+        Write-Host "`nTest 2: Attempting to read EICAR test file..."
+        if (Test-Path $testFile) {
+            try {
+                $content = Get-Content $testFile -ErrorAction Stop
+                Write-Host "WARNING: EICAR test file could be read - file may not be detected"
+            } catch {
+                Write-Host "SUCCESS: EICAR test file access was blocked"
+            }
+        }
+        
+    } catch {
+        Write-Host "An error occurred: $_"
+    } finally {
+        # Cleanup
+        Write-Host "`nCleaning up test files..."
+        if (Test-Path $testDir) {
+            Remove-Item -Path $testDir -Recurse -Force
+        }
+    }
+    
+    Write-Host "`nTest completed. Please review results above."
+}
+
+# Run the test
+Test-EICARDetection

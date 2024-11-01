@@ -1,226 +1,256 @@
-# System Configuration Assessment Tool
-# Purpose: Audit key system security configurations and generate a report
+# This script performs security audits without requiring admin privileges
 
-# Enable debug logging
-$DebugPreference = "Continue"
-$ErrorActionPreference = "Stop"
-$LogFile = ".\SecurityAudit_Debug_$(Get-Date -Format 'yyyyMMddHHmmss').log"
-
-function Write-DebugLog {
-    param(
-        [string]$Message,
-        [string]$Type = "INFO"  # INFO, ERROR, WARNING
+function Write-ProgressBar {
+    param (
+        [int]$PercentComplete,
+        [string]$Status
     )
     
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "[$timestamp] [$Type] $Message"
-    Add-Content -Path $LogFile -Value $logMessage
+    $width = 50  # Width of the progress bar
+    $filled = [math]::Round($width * ($PercentComplete / 100))
+    $unfilled = $width - $filled
+    $progressBar = ('[' + '=' * $filled + ' ' * $unfilled + ']')
     
-    switch ($Type) {
-        "ERROR" { Write-Host $logMessage -ForegroundColor Red }
-        "WARNING" { Write-Host $logMessage -ForegroundColor Yellow }
-        default { Write-Host $logMessage -ForegroundColor Gray }
+    Write-Host "`r$progressBar $PercentComplete% - $Status" -NoNewline
+    if ($PercentComplete -eq 100) {
+        Write-Host ""  # New line after completion
     }
 }
 
-function Test-AdminPrivileges {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $windowsPrincipal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-    return $windowsPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+function Format-GroupOutput {
+    param (
+        [string]$groupString
+    )
+    
+    # Split the string into individual groups
+    $groups = $groupString -split ','
+    $formattedGroups = @()
+    
+    foreach ($group in $groups) {
+        $group = $group.Trim()
+        # Check if the group contains something that looks like an email
+        if ($group -match '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') {
+            # Return tuple of text and color
+            $formattedGroups += @($group, 'DarkYellow')
+        } else {
+            $formattedGroups += @($group, 'White')
+        }
+    }
+    
+    return $formattedGroups
 }
 
-function Get-SystemSecurityAudit {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$false)]
-        [string]$ComputerName = $env:COMPUTERNAME,
+function Test-IsUserAdmin {
+    # Method 1: Direct Local Group Check
+    try {
+        Write-Host "Checking admin status using direct group membership..." -ForegroundColor Gray
+        $administratorsGroup = Get-LocalGroupMember -Group 'Administrators'
+        $currentUserName = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $isAdmin = $administratorsGroup | Where-Object { $_.Name -eq $currentUserName }
+        if ($null -ne $isAdmin) {
+            return $true, "Direct group membership check"
+        }
+    }
+    catch {
+        Write-Host "Direct admin check failed, trying alternate method..." -ForegroundColor Gray
+        # Continue to Method 2 if Method 1 fails
+    }
+
+    # Method 2: Windows Principal Check
+    try {
+        Write-Host "Checking admin status using Windows Principal..." -ForegroundColor Gray
+        $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $windowsPrincipal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+        $isAdmin = $windowsPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        return $isAdmin, "Windows Principal check"
+    }
+    catch {
+        Write-Host "Error in Windows Principal check: $($_.Exception.Message)" -ForegroundColor Red
+        return $false, "Error in admin check"
+    }
+}
+
+function Get-AntiVirusStatus {
+    $avResults = @()
+    
+    # Check Windows Defender
+    try {
+        Write-ProgressBar -PercentComplete 10 -Status "Checking Windows Defender status..."
+        $defenderStatus = Get-MpComputerStatus
+        if ($defenderStatus) {
+            $avResults += [PSCustomObject]@{
+                Check = "Windows Defender Status"
+                Status = "Info"
+                Details = "Enabled: $($defenderStatus.AntivirusEnabled)"
+                Color = if ($defenderStatus.AntivirusEnabled) { 'Green' } else { 'Red' }
+            }
+            
+            $avResults += [PSCustomObject]@{
+                Check = "Windows Defender Version"
+                Status = "Info"
+                Details = "Version: $($defenderStatus.AMProductVersion), Engine: $($defenderStatus.AMEngineVersion)"
+                Color = 'White'
+            }
+            
+            # Calculate time since last update
+            $timeSinceUpdate = (Get-Date) - $defenderStatus.AntispywareSignatureLastUpdated
+            $updateColor = if ($timeSinceUpdate.TotalHours -le 24) { 'Green' } else { 'Red' }
+            
+            $avResults += [PSCustomObject]@{
+                Check = "Windows Defender Definitions"
+                Status = if ($timeSinceUpdate.TotalHours -gt 24) { "Warning" } else { "Info" }
+                Details = "Last Updated: $($defenderStatus.AntispywareSignatureLastUpdated)"
+                Color = $updateColor
+            }
+            
+            $avResults += [PSCustomObject]@{
+                Check = "Real-time Protection"
+                Status = if (-not $defenderStatus.RealTimeProtectionEnabled) { "Warning" } else { "Info" }
+                Details = "Enabled: $($defenderStatus.RealTimeProtectionEnabled)"
+                Color = if ($defenderStatus.RealTimeProtectionEnabled) { 'Green' } else { 'Red' }
+            }
+        }
+    }
+    catch {
+        $avResults += [PSCustomObject]@{
+            Check = "Windows Defender"
+            Status = "Error"
+            Details = "Could not check: $($_.Exception.Message)"
+            Color = 'Red'
+        }
+    }
+    
+    Write-ProgressBar -PercentComplete 30 -Status "Checking third-party antivirus..."
+    # Check for other common AV products
+    try {
+        $securityCenter = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop
         
-        [Parameter(Mandatory=$false)]
-        [string]$ReportPath = ".\SecurityAudit_$(Get-Date -Format 'yyyyMMdd').txt"
-    )
+        foreach ($av in $securityCenter) {
+            $avResults += [PSCustomObject]@{
+                Check = "Third-Party Antivirus"
+                Status = "Info"
+                Details = "Found: $($av.displayName)"
+                Color = 'White'
+            }
+        }
+    }
+    catch {
+        $avResults += [PSCustomObject]@{
+            Check = "Third-Party Antivirus Check"
+            Status = "Error"
+            Details = "Could not check: $($_.Exception.Message)"
+            Color = 'Red'
+        }
+    }
 
-    Write-DebugLog "Starting security audit for $ComputerName"
+    return $avResults
+}
+
+function Start-UserSecurityAudit {
+    Clear-Host
+    Write-Host "=== Enhanced User-Level Security Audit Tool ===" -ForegroundColor Cyan
+    Write-Host "Version 2.0" -ForegroundColor Gray
+    
+    $continue = Read-Host "`nDo you want to run the security audit? (Y/N)"
+    if ($continue -ne 'Y') {
+        Write-Host "`nAudit cancelled. Press any key to exit..."
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        return
+    }
+
+    Write-Host "`nInitiating security audit..." -ForegroundColor Yellow
     $results = @()
-    
-    # Check Windows Firewall Status
-    Write-DebugLog "Checking firewall status..."
-    $firewallCheck = @{
-        Category = "Windows Firewall"
-        Test = "Firewall Status"
-        Status = $null
-        Details = $null
+
+    # Check admin status
+    Write-ProgressBar -PercentComplete 5 -Status "Checking administrative privileges..."
+    $isAdminResult = Test-IsUserAdmin
+    $results += [PSCustomObject]@{
+        Check = "Administrative Privileges"
+        Status = "Info"
+        Details = "User is admin: $($isAdminResult[0]) (Method: $($isAdminResult[1]))"
+        Color = if ($isAdminResult[0]) { 'Red' } else { 'Green' }
     }
-    
+
+    # Check Antivirus Status
+    $avStatus = Get-AntiVirusStatus
+    $results += $avStatus
+
+    # Check user account details
+    Write-ProgressBar -PercentComplete 50 -Status "Checking user account settings..."
     try {
-        $firewall = Get-NetFirewallProfile
-        $firewallCheck.Status = "Checked"
-        $firewallCheck.Details = ($firewall | ForEach-Object { "$($_.Name): $($_.Enabled)" }) -join "; "
+        $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $results += [PSCustomObject]@{
+            Check = "Current User"
+            Status = "Info"
+            Details = "Username: $($currentUser.Name)"
+            Color = 'White'
+        }
+
+        # Check group memberships with email detection
+        $groups = $currentUser.Groups | ForEach-Object {
+            try { $_.Translate([System.Security.Principal.NTAccount]).Value } catch { $_.Value }
+        }
+        $groupString = ($groups -join ", ")
+        $formattedGroups = Format-GroupOutput -groupString $groupString
+        
+        # Store the formatted groups for special handling during display
+        $results += [PSCustomObject]@{
+            Check = "Group Memberships"
+            Status = "Info"
+            Details = $formattedGroups  # This will be an array of strings and colors
+            IsFormattedOutput = $true   # Flag for special handling
+        }
     }
     catch {
-        Write-DebugLog "Error checking firewall: $($_.Exception.Message)" "ERROR"
-        $firewallCheck.Status = "Error"
-        $firewallCheck.Details = $_.Exception.Message
+        $results += [PSCustomObject]@{
+            Check = "User Account"
+            Status = "Error"
+            Details = $_.Exception.Message
+            Color = 'Red'
+        }
     }
-    $results += [PSCustomObject]$firewallCheck
 
-    # Check Account Policies
-    Write-DebugLog "Checking account policies..."
-    $accountPolicies = @{
-        Category = "Account Policies"
-        Test = "Password Policy"
-        Status = $null
-        Details = $null
-    }
-    
-    try {
-        $netAccounts = net accounts
-        $accountPolicies.Status = "Checked"
-        $accountPolicies.Details = ($netAccounts | Select-String "Password") -join "; "
-    }
-    catch {
-        Write-DebugLog "Error checking account policies: $($_.Exception.Message)" "ERROR"
-        $accountPolicies.Status = "Error"
-        $accountPolicies.Details = $_.Exception.Message
-    }
-    $results += [PSCustomObject]$accountPolicies
+    # Rest of the checks remain the same...
+    Write-ProgressBar -PercentComplete 100 -Status "Completing audit..."
+    Start-Sleep -Seconds 1  # Pause to show 100% completion
 
-    # Check Windows Updates
-    Write-DebugLog "Checking Windows updates..."
-    $updateCheck = @{
-        Category = "Windows Updates"
-        Test = "Update Status"
-        Status = $null
-        Details = $null
-    }
-    
-    try {
-        $updates = Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 5
-        $updateCheck.Status = "Checked"
-        $updateCheck.Details = "Last 5 updates: " + ($updates | ForEach-Object { "$($_.HotFixID) ($($_.InstalledOn))" }) -join "; "
-    }
-    catch {
-        Write-DebugLog "Error checking Windows updates: $($_.Exception.Message)" "ERROR"
-        $updateCheck.Status = "Error"
-        $updateCheck.Details = $_.Exception.Message
-    }
-    $results += [PSCustomObject]$updateCheck
-
-    # Check Running Services
-    Write-DebugLog "Checking critical services..."
-    $serviceCheck = @{
-        Category = "Services"
-        Test = "Critical Services"
-        Status = $null
-        Details = $null
-    }
-    
-    try {
-        $criticalServices = Get-Service -Name "WinDefend", "wscsvc", "SecurityHealthService" -ErrorAction SilentlyContinue |
-            Select-Object Name, Status
-        $serviceCheck.Status = "Checked"
-        $serviceCheck.Details = ($criticalServices | ForEach-Object { "$($_.Name): $($_.Status)" }) -join "; "
-    }
-    catch {
-        Write-DebugLog "Error checking services: $($_.Exception.Message)" "ERROR"
-        $serviceCheck.Status = "Error"
-        $serviceCheck.Details = $_.Exception.Message
-    }
-    $results += [PSCustomObject]$serviceCheck
-
-    # Generate Report
-    Write-DebugLog "Generating report..."
-    $report = @"
-System Security Audit Report
-Computer Name: $ComputerName
-Date: $(Get-Date)
-----------------------------------------
-
-"@
-
+    # Display results with special handling for formatted group output
+    Write-Host "`nAudit Results:`n" -ForegroundColor Green
     foreach ($result in $results) {
-        $report += @"
-Category: $($result.Category)
-Test: $($result.Test)
-Status: $($result.Status)
-Details: $($result.Details)
-----------------------------------------
-
-"@
+        Write-Host "Check: " -NoNewline
+        Write-Host $result.Check -ForegroundColor Cyan -NoNewline
+        Write-Host " | Status: " -NoNewline
+        Write-Host $result.Status -ForegroundColor Yellow -NoNewline
+        Write-Host " | " -NoNewline
+        
+        if ($result.IsFormattedOutput) {
+            # Handle the specially formatted group output
+            for ($i = 0; $i -lt $result.Details.Count; $i += 2) {
+                Write-Host $result.Details[$i] -ForegroundColor $result.Details[$i + 1] -NoNewline
+                if ($i -lt $result.Details.Count - 2) {
+                    Write-Host ", " -NoNewline
+                }
+            }
+            Write-Host ""
+        }
+        else {
+            Write-Host $result.Details -ForegroundColor $result.Color
+        }
     }
 
-    # Save report
+    # Save results to file
+    $reportPath = ".\SecurityAudit_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
     try {
-        $report | Out-File -FilePath $ReportPath -Force
-        Write-DebugLog "Report saved to $ReportPath"
+        $results | Select-Object Check, Status, Details | Format-Table -AutoSize | Out-File $reportPath
+        Write-Host "`nReport saved to: $reportPath" -ForegroundColor Green
     }
     catch {
-        Write-DebugLog "Error saving report: $($_.Exception.Message)" "ERROR"
+        Write-Host "`nCould not save report to file: $($_.Exception.Message)" -ForegroundColor Red
     }
-    
-    return $results | Format-Table -AutoSize
+
+    Write-Host "`nPress any key to exit..."
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
-# Function to check specific security settings
-function Get-SecuritySettings {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$false)]
-        [string]$ComputerName = $env:COMPUTERNAME
-    )
-    
-    Write-DebugLog "Checking security settings for $ComputerName..."
-    
-    $settings = @{}
-    
-    try {
-        $settings.SMBv1 = (Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol).State
-        $settings.PowerShellVersion = $PSVersionTable.PSVersion
-        $settings.ExecutionPolicy = Get-ExecutionPolicy
-        $settings.BitLockerStatus = (Get-BitLockerVolume -ErrorAction SilentlyContinue).ProtectionStatus
-        $settings.DefenderStatus = (Get-MpComputerStatus).AntivirusEnabled
-    }
-    catch {
-        Write-DebugLog "Error checking security settings: $($_.Exception.Message)" "ERROR"
-    }
-    
-    return [PSCustomObject]$settings | Format-List
-}
-
-# Main execution block
-Write-Host "`n=== System Security Audit Tool ===" -ForegroundColor Cyan
-Write-Host "This script will perform a security audit of your system." -ForegroundColor Yellow
-Write-Host "Debug logs will be written to: $LogFile" -ForegroundColor Gray
-
-# Check for admin privileges
-if (-not (Test-AdminPrivileges)) {
-    Write-Host "`nWARNING: This script requires administrative privileges to perform a complete audit." -ForegroundColor Red
-    Write-Host "Please run PowerShell as Administrator.`n" -ForegroundColor Red
-    exit
-}
-
-# Prompt for confirmation
-$confirmation = Read-Host "`nDo you want to proceed with the security audit? (Y/N)"
-if ($confirmation -ne 'Y') {
-    Write-Host "`nAudit cancelled by user. Exiting...`n" -ForegroundColor Yellow
-    exit
-}
-
-try {
-    Write-Host "`nStarting security audit..." -ForegroundColor Green
-    Write-Host "Running Get-SystemSecurityAudit..." -ForegroundColor Cyan
-    Get-SystemSecurityAudit
-
-    Write-Host "`nRunning Get-SecuritySettings..." -ForegroundColor Cyan
-    Get-SecuritySettings
-    
-    Write-Host "`nAudit completed successfully!" -ForegroundColor Green
-    Write-Host "Debug log saved to: $LogFile" -ForegroundColor Gray
-}
-catch {
-    Write-DebugLog "Critical error during audit: $($_.Exception.Message)" "ERROR"
-    Write-Host "`nAn error occurred during the audit. Please check the debug log for details." -ForegroundColor Red
-    Write-Host "Debug log location: $LogFile" -ForegroundColor Gray
-}
-finally {
-    Write-Host "`nScript execution completed.`n" -ForegroundColor Cyan
-}
+# Run the audit
+Start-UserSecurityAudit

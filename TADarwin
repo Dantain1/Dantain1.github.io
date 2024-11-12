@@ -16,7 +16,6 @@ find_nessus_agent() {
     done
     
     # If not found in common paths, try to find it
-    # Restrict find to specific directories to improve performance and reduce errors
     local search_paths=("/opt" "/Library" "/Applications")
     for search_path in "${search_paths[@]}"; do
         if [ -d "$search_path" ]; then
@@ -31,62 +30,36 @@ find_nessus_agent() {
     return 1
 }
 
-# Function to check if script is running with sudo/root
+# Function to check if script is running with sufficient privileges
 check_root() {
     if [ "$(id -u)" != "0" ]; then
-        echo "Error: This script must be run with sudo or as root"
+        echo "Error: This script must be run with root privileges"
         exit 1
     fi
 }
 
-# Function to prompt for configuration
-get_config() {
-    # Use default values if provided as environment variables
+# Function to get linking key from user
+get_linking_key() {
     LINKING_KEY=${LINKING_KEY:-""}
-    SERVER=${SERVER:-""}
-    PORT=${PORT:-"8834"}
     
     # Prompt for linking key if not provided
     while [ -z "$LINKING_KEY" ]; do
-        read -rp "Enter your Nessus Agent linking key: " LINKING_KEY
+        echo -n "Enter your Tenable.io linking key: "
+        read -r LINKING_KEY
         if [ -z "$LINKING_KEY" ]; then
             echo "Linking key cannot be empty. Please try again."
         fi
     done
-    
-    # Prompt for server if not provided
-    while [ -z "$SERVER" ]; do
-        read -rp "Enter your Nessus server address [default: localhost]: " SERVER
-        SERVER=${SERVER:-"localhost"}
-    done
-    
-    # Prompt for port if not default
-    read -rp "Enter your Nessus server port [default: 8834]: " PORT_INPUT
-    PORT=${PORT_INPUT:-"8834"}
-    
-    # Validate port number
-    if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
-        echo "Error: Invalid port number. Must be between 1 and 65535."
-        exit 1
-    fi
-    
-    # Display configuration for confirmation
-    echo -e "\nConfiguration Summary:"
-    echo "Server: $SERVER"
-    echo "Port: $PORT"
-    echo "Linking Key: ${LINKING_KEY:0:8}..." # Show only first 8 characters for security
-    
-    read -rp "Is this correct? (y/n): " CONFIRM
-    if [[ ! $CONFIRM =~ ^[Yy] ]]; then
-        echo "Configuration cancelled. Please run the script again."
-        exit 1
-    fi
 }
 
 # Main script
 main() {
     # Check for root privileges
     check_root
+    
+    # Set Tenable.io default connection details
+    SERVER="cloud.tenable.com"
+    PORT="443"
     
     echo "Searching for Nessus Agent installation..."
     NESSUSCLI=$(find_nessus_agent)
@@ -107,8 +80,8 @@ main() {
         exit 1
     fi
     
-    # Get configuration from user
-    get_config
+    # Get linking key from user
+    get_linking_key
     
     # Unlink existing agent if already linked
     echo "Checking current agent status..."
@@ -117,14 +90,14 @@ main() {
         "$NESSUSCLI" agent unlink
     fi
     
-    # Link the agent
-    echo "Linking agent to server..."
+    # Link the agent to Tenable.io
+    echo "Linking agent to Tenable.io..."
     if ! "$NESSUSCLI" agent link --key="$LINKING_KEY" --host="$SERVER" --port="$PORT"; then
         echo "Error: Failed to link Nessus Agent"
         exit 1
     fi
     
-    echo "Successfully linked Nessus Agent"
+    echo "Successfully linked Nessus Agent to Tenable.io"
     echo "Current agent status:"
     "$NESSUSCLI" agent status
 }

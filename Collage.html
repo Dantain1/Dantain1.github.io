@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallpaper Maker</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: auto;
+    }
+    .overflow-scroll {
+      overflow: scroll;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+    
+    // Create Menu icon component manually instead of using Lucide React
+    const MenuIcon = () => {
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" y1="12" x2="20" y2="12"></line>
+          <line x1="4" y1="6" x2="20" y2="6"></line>
+          <line x1="4" y1="18" x2="20" y2="18"></line>
+        </svg>
+      );
+    };
+
+    const WallpaperMaker = () => {
+      // Constants for grid and image dimensions
+      const GRID_WIDTH = 8;
+      const GRID_HEIGHT = 4;
+      const CANVAS_WIDTH = 1920;
+      const CANVAS_HEIGHT = 1080;
+      const CELL_WIDTH = CANVAS_WIDTH / GRID_WIDTH;
+      const CELL_HEIGHT = CANVAS_HEIGHT / GRID_HEIGHT;
+      
+      // State for grid cells
+      const [cells, setCells] = useState(Array(GRID_WIDTH * GRID_HEIGHT).fill().map(() => ({
+        image: null,
+        position: { x: 0, y: 0 },
+        scale: 1,
+        isDragging: false,
+        dragStart: { x: 0, y: 0 }
+      })));
+      
+      // State for burger menu
+      const [menuOpen, setMenuOpen] = useState(false);
+      
+      // Ref for the canvas to export the final image
+      const canvasRef = useRef(null);
+      
+      // Function to toggle menu
+      const toggleMenu = () => {
+        setMenuOpen(!menuOpen);
+      };
+      
+      // Handle dropping an image onto a cell
+      const handleDrop = (e, index) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.match('image.*')) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              setCells(prevCells => {
+                const newCells = [...prevCells];
+                newCells[index] = {
+                  ...newCells[index],
+                  image: img,
+                  position: { x: 0, y: 0 },
+                  scale: 1
+                };
+                return newCells;
+              });
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      
+      // Prevent default behavior for dragover to allow dropping
+      const handleDragOver = (e) => {
+        e.preventDefault();
+      };
+      
+      // Handle start of dragging the image within a cell
+      const handleMouseDown = (e, index) => {
+        if (cells[index].image) {
+          setCells(prevCells => {
+            const newCells = [...prevCells];
+            newCells[index] = {
+              ...newCells[index],
+              isDragging: true,
+              dragStart: { 
+                x: e.clientX - newCells[index].position.x, 
+                y: e.clientY - newCells[index].position.y 
+              }
+            };
+            return newCells;
+          });
+        }
+      };
+      
+      // Handle dragging the image within a cell
+      const handleMouseMove = (e, index) => {
+        if (cells[index].isDragging) {
+          setCells(prevCells => {
+            const newCells = [...prevCells];
+            newCells[index] = {
+              ...newCells[index],
+              position: { 
+                x: e.clientX - newCells[index].dragStart.x, 
+                y: e.clientY - newCells[index].dragStart.y 
+              }
+            };
+            return newCells;
+          });
+        }
+      };
+      
+      // Handle end of dragging
+      const handleMouseUp = (index) => {
+        setCells(prevCells => {
+          const newCells = [...prevCells];
+          newCells[index] = {
+            ...newCells[index],
+            isDragging: false
+          };
+          return newCells;
+        });
+      };
+      
+      // Handle zooming of an image within a cell
+      const handleWheel = (e, index) => {
+        e.preventDefault();
+        if (cells[index].image) {
+          const delta = -e.deltaY / 500;
+          const newScale = Math.max(0.1, Math.min(3, cells[index].scale + delta));
+          
+          setCells(prevCells => {
+            const newCells = [...prevCells];
+            newCells[index] = {
+              ...newCells[index],
+              scale: newScale
+            };
+            return newCells;
+          });
+        }
+      };
+      
+      // Export the final wallpaper as an image
+      const exportWallpaper = () => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw each cell's image onto the canvas
+        cells.forEach((cell, index) => {
+          if (cell.image) {
+            const row = Math.floor(index / GRID_WIDTH);
+            const col = index % GRID_WIDTH;
+            const x = col * CELL_WIDTH;
+            const y = row * CELL_HEIGHT;
+            
+            // Create a clipping region for the cell
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x, y, CELL_WIDTH, CELL_HEIGHT);
+            ctx.clip();
+            
+            // Calculate the image drawing parameters
+            const centerX = x + CELL_WIDTH / 2;
+            const centerY = y + CELL_HEIGHT / 2;
+            const scaledWidth = cell.image.width * cell.scale;
+            const scaledHeight = cell.image.height * cell.scale;
+            
+            // Draw the image with scale and position
+            ctx.drawImage(
+              cell.image,
+              centerX - scaledWidth / 2 + cell.position.x,
+              centerY - scaledHeight / 2 + cell.position.y,
+              scaledWidth,
+              scaledHeight
+            );
+            
+            ctx.restore();
+          }
+        });
+        
+        // Convert canvas to an image and trigger download
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'desktop-wallpaper.png';
+        link.href = dataUrl;
+        link.click();
+        
+        // Close menu after export
+        setMenuOpen(false);
+      };
+      
+      // Clear all cells
+      const clearAllCells = () => {
+        setCells(Array(GRID_WIDTH * GRID_HEIGHT).fill().map(() => ({
+          image: null,
+          position: { x: 0, y: 0 },
+          scale: 1,
+          isDragging: false,
+          dragStart: { x: 0, y: 0 }
+        })));
+        
+        // Close menu after clearing
+        setMenuOpen(false);
+      };
+      
+      // Helper to check if all cells have images
+      const allCellsFilled = cells.every(cell => cell.image !== null);
+
+      // Handle window resize
+      const [scale, setScale] = useState(1);
+      
+      useEffect(() => {
+        const handleResize = () => {
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+          const scaleX = (windowWidth - 40) / CANVAS_WIDTH;
+          const scaleY = (windowHeight - 40) / CANVAS_HEIGHT;
+          setScale(Math.min(scaleX, scaleY, 1)); // Don't scale up beyond original size
+        };
+        
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }, []);
+      
+      return (
+        <div className="flex justify-center items-center bg-black min-h-screen relative overflow-scroll">      
+          {/* Burger menu button */}
+          <div className="fixed top-4 right-4 z-20">
+            <button 
+              onClick={toggleMenu}
+              className="p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-70"
+            >
+              <MenuIcon />
+            </button>
+            
+            {/* Floating menu */}
+            {menuOpen && (
+              <div className="absolute top-10 right-0 bg-black bg-opacity-75 p-2 rounded-lg shadow-lg">
+                <button 
+                  onClick={exportWallpaper}
+                  disabled={!allCellsFilled}
+                  className={`block w-full text-left px-4 py-2 mb-1 rounded ${allCellsFilled ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+                >
+                  Export
+                </button>
+                <button 
+                  onClick={clearAllCells}
+                  className="block w-full text-left px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Collage grid at actual size with scaling for smaller screens */}
+          <div 
+            className="grid border border-gray-800 bg-black m-4"
+            style={{ 
+              gridTemplateColumns: `repeat(${GRID_WIDTH}, ${CELL_WIDTH * scale}px)`,
+              gridTemplateRows: `repeat(${GRID_HEIGHT}, ${CELL_HEIGHT * scale}px)`,
+              width: `${CANVAS_WIDTH * scale}px`,
+              height: `${CANVAS_HEIGHT * scale}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left'
+            }}
+          >
+            {cells.map((cell, index) => (
+              <div 
+                key={index}
+                className="relative border border-gray-800 overflow-hidden"
+                onDrop={(e) => handleDrop(e, index)}
+                onDragOver={handleDragOver}
+                onMouseDown={(e) => handleMouseDown(e, index)}
+                onMouseMove={(e) => handleMouseMove(e, index)}
+                onMouseUp={() => handleMouseUp(index)}
+                onMouseLeave={() => handleMouseUp(index)}
+                onWheel={(e) => handleWheel(e, index)}
+              >
+                {cell.image ? (
+                  <div 
+                    className="absolute"
+                    style={{
+                      width: `${cell.image.width * cell.scale}px`,
+                      height: `${cell.image.height * cell.scale}px`,
+                      left: `${CELL_WIDTH / 2 - (cell.image.width * cell.scale / 2) + cell.position.x}px`,
+                      top: `${CELL_HEIGHT / 2 - (cell.image.height * cell.scale / 2) + cell.position.y}px`,
+                      cursor: 'move',
+                      backgroundImage: `url(${cell.image.src})`,
+                      backgroundSize: '100% 100%'
+                    }}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </div>
+          
+          {/* Hidden canvas for exporting */}
+          <canvas 
+            ref={canvasRef} 
+            width={CANVAS_WIDTH} 
+            height={CANVAS_HEIGHT} 
+            style={{ display: 'none' }}
+          />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<WallpaperMaker />);
+  </script>
+</body>
+</html>
